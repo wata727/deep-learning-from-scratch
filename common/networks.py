@@ -66,11 +66,12 @@ class TwoLayerNet:
         return grads
 
 class MultiLayerNet:
-    def __init__(self, input_size: int, hidden_size_list: list[int], output_size: int, weight_init_std: float=0.01, use_batchnorm: bool=False):
+    def __init__(self, input_size: int, hidden_size_list: list[int], output_size: int, weight_init_std: str | float = 'relu', use_batchnorm: bool=False, weight_decay_lambda: float=0.0):
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size_list = hidden_size_list
         self.hidden_layer_num = len(hidden_size_list)
+        self.weight_decay_lambda = weight_decay_lambda
         self.use_batchnorm = use_batchnorm
         self.params: dict[str, npt.NDArray] = {}
 
@@ -89,10 +90,16 @@ class MultiLayerNet:
         self.layers['Affine' + str(idx)] = Affine(self.params['W' + str(idx)], self.params['b' + str(idx)])
         self.lastLayer = SoftmaxWithLoss()
 
-    def __init_weight(self, weight_init_std: float):
+    def __init_weight(self, weight_init_std: str | float):
         all_size_list = [self.input_size] + self.hidden_size_list + [self.output_size]
         for idx in range(1, len(all_size_list)):
-            self.params['W' + str(idx)] = weight_init_std * np.random.randn(all_size_list[idx-1], all_size_list[idx])
+            scale = weight_init_std
+            if str(weight_init_std).lower() in ('relu', 'he'):
+                scale = np.sqrt(2.0 / all_size_list[idx - 1])
+            elif str(weight_init_std).lower() in ('sigmoid', 'xavier'):
+                scale = np.sqrt(1.0 / all_size_list[idx - 1])
+
+            self.params['W' + str(idx)] = scale * np.random.randn(all_size_list[idx-1], all_size_list[idx])
             self.params['b' + str(idx)] = np.zeros(all_size_list[idx])
 
     def predict(self, x: npt.NDArray) -> npt.NDArray:
@@ -103,7 +110,13 @@ class MultiLayerNet:
 
     def loss(self, x: npt.NDArray, t: npt.NDArray) -> float:
         y = self.predict(x)
-        return self.lastLayer.forward(y, t)
+
+        weight_decay = 0
+        for idx in range(1, self.hidden_layer_num + 2):
+            W = self.params['W' + str(idx)]
+            weight_decay += 0.5 * self.weight_decay_lambda * np.sum(W ** 2)
+
+        return self.lastLayer.forward(y, t) + weight_decay
 
     def accuracy(self, x: npt.NDArray, t: npt.NDArray) -> npt.NDArray:
         y = self.predict(x)
@@ -138,7 +151,7 @@ class MultiLayerNet:
 
         grads = {}
         for idx in range(1, self.hidden_layer_num + 2):
-            grads['W' + str(idx)] = self.layers['Affine' + str(idx)].dW # type: ignore
+            grads['W' + str(idx)] = self.layers['Affine' + str(idx)].dW + self.weight_decay_lambda * self.layers['Affine' + str(idx)].W # type: ignore
             grads['b' + str(idx)] = self.layers['Affine' + str(idx)].db # type: ignore
             if self.use_batchnorm and idx != self.hidden_layer_num+1:
                 grads['gamma' + str(idx)] = self.layers['BatchNorm' + str(idx)].dgamma # type: ignore
