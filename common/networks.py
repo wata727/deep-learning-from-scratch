@@ -66,13 +66,14 @@ class TwoLayerNet:
         return grads
 
 class MultiLayerNet:
-    def __init__(self, input_size: int, hidden_size_list: list[int], output_size: int, weight_init_std: str | float = 'relu', use_batchnorm: bool=False, weight_decay_lambda: float=0.0):
+    def __init__(self, input_size: int, hidden_size_list: list[int], output_size: int, weight_init_std: str | float = 'relu', use_batchnorm: bool=False, weight_decay_lambda: float=0.0, use_dropout: bool=False, dropout_ration: float=0.5):
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size_list = hidden_size_list
         self.hidden_layer_num = len(hidden_size_list)
         self.weight_decay_lambda = weight_decay_lambda
         self.use_batchnorm = use_batchnorm
+        self.use_dropout = use_dropout
         self.params: dict[str, npt.NDArray] = {}
 
         self.__init_weight(weight_init_std)
@@ -85,6 +86,8 @@ class MultiLayerNet:
                 self.params['beta' + str(idx)] = np.zeros(hidden_size_list[idx-1])
                 self.layers['BatchNorm' + str(idx)] = BatchNormalization(self.params['gamma' + str(idx)], self.params['beta' + str(idx)])
             self.layers['Relu' + str(idx)] = Relu()
+            if use_dropout:
+                self.layers['Dropout' + str(idx)] = Dropout(dropout_ration)
 
         idx = self.hidden_layer_num + 1
         self.layers['Affine' + str(idx)] = Affine(self.params['W' + str(idx)], self.params['b' + str(idx)])
@@ -102,14 +105,17 @@ class MultiLayerNet:
             self.params['W' + str(idx)] = scale * np.random.randn(all_size_list[idx-1], all_size_list[idx])
             self.params['b' + str(idx)] = np.zeros(all_size_list[idx])
 
-    def predict(self, x: npt.NDArray) -> npt.NDArray:
-        for layer in self.layers.values():
-            x = layer.forward(x)
+    def predict(self, x: npt.NDArray, train_flg: bool = False) -> npt.NDArray:
+        for key, layer in self.layers.items():
+            if "Dropout" in key:
+                x = layer.forward(x, train_flg)
+            else:
+                x = layer.forward(x)
 
         return x
 
-    def loss(self, x: npt.NDArray, t: npt.NDArray) -> float:
-        y = self.predict(x)
+    def loss(self, x: npt.NDArray, t: npt.NDArray, train_flg: bool = False) -> float:
+        y = self.predict(x, train_flg)
 
         weight_decay = 0
         for idx in range(1, self.hidden_layer_num + 2):
@@ -119,7 +125,7 @@ class MultiLayerNet:
         return self.lastLayer.forward(y, t) + weight_decay
 
     def accuracy(self, x: npt.NDArray, t: npt.NDArray) -> npt.NDArray:
-        y = self.predict(x)
+        y = self.predict(x, train_flg=False)
         y = np.argmax(y, axis=1)
         if t.ndim != 1 : t = np.argmax(t, axis=1)
 
@@ -127,7 +133,7 @@ class MultiLayerNet:
         return accuracy
 
     def numerical_gradient(self, x: npt.NDArray, t: npt.NDArray) -> dict[str, npt.NDArray]:
-        loss_W = lambda W: self.loss(x, t)
+        loss_W = lambda W: self.loss(x, t, train_flg=True)
 
         grads = {}
         for idx in range(1, self.hidden_layer_num + 2):
@@ -140,7 +146,7 @@ class MultiLayerNet:
         return grads
 
     def gradient(self, x: npt.NDArray, t: npt.NDArray) -> dict[str, npt.NDArray]:
-        self.loss(x, t)
+        self.loss(x, t, train_flg=True)
 
         dout = self.lastLayer.backward(1)
 

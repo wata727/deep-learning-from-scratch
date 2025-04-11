@@ -156,3 +156,18 @@ class BatchNormalization(Layer):
         self.dbeta = dbeta
 
         return dx
+
+class Dropout(Layer):
+    def __init__(self, dropout_ratio: float = 0.5):
+        self.dropout_ratio = dropout_ratio
+        self.mask = None
+
+    def forward(self, x: npt.NDArray, train_flg: bool = True) -> npt.NDArray:
+        if train_flg:
+            self.mask = np.random.rand(*x.shape) > self.dropout_ratio
+            return x * self.mask
+        else:
+            return x * (1.0 - self.dropout_ratio)
+
+    def backward(self, dout: npt.NDArray) -> npt.NDArray:
+        return dout * self.mask
