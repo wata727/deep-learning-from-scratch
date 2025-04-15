@@ -1,15 +1,25 @@
 import numpy as np
+import numpy.typing as npt
 from collections import OrderedDict
+from typing import TypedDict, cast
 from upstream.dataset.mnist import load_mnist
 from common.layers import *
 from common.optimizer import Adam
+from common.networks import Network
 from common.trainer import Trainer
 
-class SimpleConvNet:
-    def __init__(self, input_dim=(1, 28, 28),
-                 conv_param={'filter_num': 30, 'filter_size': 5,
+ConvParam = TypedDict('ConvParam', {
+    'filter_num': int,
+    'filter_size': int,
+    'pad': int,
+    'stride': int
+})
+
+class SimpleConvNet(Network):
+    def __init__(self, input_dim: tuple[int, int, int]=(1, 28, 28),
+                 conv_param: ConvParam={'filter_num': 30, 'filter_size': 5,
                              'pad': 0, 'stride': 1},
-                             hidden_size=100, output_size=10, weight_init_std=0.01):
+                             hidden_size: int=100, output_size: int=10, weight_init_std: float=0.01):
         filter_num = conv_param['filter_num']
         filter_size = conv_param['filter_size']
         filter_pad = conv_param['pad']
@@ -26,7 +36,7 @@ class SimpleConvNet:
         self.params['W3'] = weight_init_std * np.random.randn(hidden_size, output_size)
         self.params['b3'] = np.zeros(output_size)
 
-        self.layers = OrderedDict()
+        self.layers: OrderedDict[str, Layer] = OrderedDict()
         self.layers['Conv1'] = Convolution(self.params['W1'], self.params['b1'], filter_stride, filter_pad)
         self.layers['Relu1'] = Relu()
         self.layers['Pool1'] = Pooling(pool_h=2, pool_w=2, stride=2)
@@ -36,16 +46,16 @@ class SimpleConvNet:
 
         self.last_layer = SoftmaxWithLoss()
 
-    def predict(self, x):
+    def predict(self, x: npt.NDArray[np.double]) -> npt.NDArray[np.double]:
         for layer in self.layers.values():
             x = layer.forward(x)
         return x
 
-    def loss(self, x, t):
+    def loss(self, x: npt.NDArray[np.double], t: npt.NDArray[np.double]) -> float:
         y = self.predict(x)
         return self.last_layer.forward(y, t)
 
-    def accuracy(self, x, t, batch_size=100):
+    def accuracy(self, x: npt.NDArray[np.double], t: npt.NDArray[np.double], batch_size: int=100) -> float:
         if t.ndim != 1 : t = np.argmax(t, axis=1)
 
         acc = 0.0
@@ -59,11 +69,10 @@ class SimpleConvNet:
 
         return acc / x.shape[0]
 
-    def gradient(self, x, t):
+    def gradient(self, x: npt.NDArray[np.double], t: npt.NDArray[np.double]) -> dict[str, npt.NDArray[np.double]]:
         self.loss(x, t)
 
-        dout = 1
-        dout = self.last_layer.backward(dout)
+        dout = self.last_layer.backward(1)
 
         layers = list(self.layers.values())
         layers.reverse()
@@ -71,16 +80,16 @@ class SimpleConvNet:
             dout = layer.backward(dout)
 
         grads = {}
-        grads['W1'] = self.layers['Conv1'].dW
-        grads['b1'] = self.layers['Conv1'].db
-        grads['W2'] = self.layers['Affine1'].dW
-        grads['b2'] = self.layers['Affine1'].db
-        grads['W3'] = self.layers['Affine2'].dW
-        grads['b3'] = self.layers['Affine2'].db
+        grads['W1'] = cast(Convolution, self.layers['Conv1']).dW
+        grads['b1'] = cast(Convolution, self.layers['Conv1']).db
+        grads['W2'] = cast(Affine, self.layers['Affine1']).dW
+        grads['b2'] = cast(Affine, self.layers['Affine1']).db
+        grads['W3'] = cast(Affine, self.layers['Affine2']).dW
+        grads['b3'] = cast(Affine, self.layers['Affine2']).db
 
         return grads
 
-(x_train, t_train), (x_test, t_test) = load_mnist(flatten=False)
+(x_train, t_train), (x_test, t_test) = load_mnist(flatten=False) # type: ignore[no-untyped-call]
 
 max_epochs = 20
 

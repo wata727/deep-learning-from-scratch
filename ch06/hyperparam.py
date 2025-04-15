@@ -5,7 +5,7 @@ from common.optimizer import SGD
 from common.networks import MultiLayerNet
 from common.trainer import Trainer
 
-(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True)
+(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True) # type: ignore[no-untyped-call]
 x_train = x_train[:500]
 t_train = t_train[:500]
 

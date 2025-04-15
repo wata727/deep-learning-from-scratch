@@ -1,21 +1,24 @@
 from collections.abc import Callable
 import numpy as np
 import numpy.typing as npt
+from typing import TypedDict, cast
 from upstream.dataset.mnist import load_mnist
 from common.functions import sigmoid, softmax
+from common.types import *
 
-def sum_squared_error(y: npt.NDArray, t: npt.NDArray) -> float:
+def sum_squared_error(y: npt.NDArray[np.double], t: npt.NDArray[np.double]) -> float:
     return 0.5 * np.sum((y-t)**2)
 
-def cross_entropy_error(y: npt.NDArray, t: npt.NDArray) -> float:
+def cross_entropy_error(y: npt.NDArray[np.double], t: npt.NDArray[np.double]) -> float:
     if y.ndim == 1:
         t = t.reshape(1, t.size)
-        y = t.reshape(1, y.size)
+        y = y.reshape(1, y.size)
 
     batch_size = y.shape[0]
-    return -np.sum(t * np.log(y + 1e-7)) / batch_size
+    v: float = -np.sum(t * np.log(y + 1e-7)) / batch_size
+    return v
 
-def numerical_gradient(f: Callable, x: npt.NDArray) -> npt.NDArray:
+def numerical_gradient[T: tuple[int, ...]](f: Callable[[npt.NDArray[np.double]], float], x: np.ndarray[T, np.dtype[np.double]]) -> np.ndarray[T, np.dtype[np.double]]:
     h = 1e-4
     grad = np.zeros_like(x)
 
@@ -35,15 +38,25 @@ def numerical_gradient(f: Callable, x: npt.NDArray) -> npt.NDArray:
 
     return grad
 
-class TwoLayerNet:
-    def __init__(self, input_size: int, hidden_size: int, output_size: int, weight_init_std: float=0.01):
-        self.params = {}
-        self.params['W1'] = weight_init_std * np.random.randn(input_size, hidden_size)
-        self.params['b1'] = np.zeros(hidden_size)
-        self.params['W2'] = weight_init_std * np.random.randn(hidden_size, output_size)
-        self.params['b2'] = np.zeros(output_size)
+Params = TypedDict('Params', {
+    'W1': Matrix[np.double],
+    'b1': Vector[np.double],
+    'W2': Matrix[np.double],
+    'b2': Vector[np.double]
+})
 
-    def predict(self, x: npt.NDArray) -> npt.NDArray:
+class TwoLayerNet:
+    params: Params
+
+    def __init__(self, input_size: int, hidden_size: int, output_size: int, weight_init_std: float=0.01):
+        self.params = {
+            'W1': cast(Matrix[np.double], weight_init_std * np.random.randn(input_size, hidden_size)),
+            'b1': np.zeros(hidden_size),
+            'W2': cast(Matrix[np.double], weight_init_std * np.random.randn(hidden_size, output_size)),
+            'b2': np.zeros(output_size)
+        }
+
+    def predict(self, x: npt.NDArray[np.double]) -> npt.NDArray[np.double]:
         W1, W2 = self.params['W1'], self.params['W2']
         b1, b2 = self.params['b1'], self.params['b2']
 
@@ -54,31 +67,30 @@ class TwoLayerNet:
 
         return y
 
-    def loss(self, x: npt.NDArray, t: npt.NDArray) -> float:
+    def loss(self, x: npt.NDArray[np.double], t: npt.NDArray[np.double]) -> float:
         y = self.predict(x)
 
         return cross_entropy_error(y, t)
 
-    def accuracy(self, x: npt.NDArray, t: npt.NDArray) -> float:
+    def accuracy(self, x: Matrix[np.double], t: Matrix[np.double]) -> float:
         y = self.predict(x)
         y = np.argmax(y, axis=1)
         t = np.argmax(t, axis=1)
 
-        accurancy = np.sum(y == t) / float(x.shape[0])
+        accurancy: float = np.sum(y == t) / float(x.shape[0])
         return accurancy
 
-    def numerical_gradient(self, x: npt.NDArray, t: npt.NDArray) -> dict[str, npt.NDArray]:
+    def numerical_gradient(self, x: npt.NDArray[np.double], t: npt.NDArray[np.double]) -> Params:
         loss_W = lambda W: self.loss(x, t)
 
-        grads = {}
-        grads['W1'] = numerical_gradient(loss_W, self.params['W1'])
-        grads['b1'] = numerical_gradient(loss_W, self.params['b1'])
-        grads['W2'] = numerical_gradient(loss_W, self.params['W2'])
-        grads['b2'] = numerical_gradient(loss_W, self.params['b2'])
+        return {
+            'W1': numerical_gradient(loss_W, self.params['W1']),
+            'b1': numerical_gradient(loss_W, self.params['b1']),
+            'W2': numerical_gradient(loss_W, self.params['W2']),
+            'b2': numerical_gradient(loss_W, self.params['b2'])
+        }
 
-        return grads
-
-(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True)
+(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True) # type: ignore[no-untyped-call]
 
 iters_num = 10000
 train_size = x_train.shape[0]
@@ -99,8 +111,10 @@ for i in range(iters_num):
 
     grad = network.numerical_gradient(x_batch, t_batch)
 
-    for key in ('W1', 'b1', 'W2', 'b2'):
-        network.params[key] -= learning_rate * grad[key]
+    network.params['W1'] -= cast(Matrix[np.double], learning_rate * grad['W1'])
+    network.params['b1'] -= cast(Vector[np.double], learning_rate * grad['b1'])
+    network.params['W2'] -= cast(Matrix[np.double], learning_rate * grad['W2'])
+    network.params['b2'] -= cast(Vector[np.double], learning_rate * grad['b2'])
 
     loss = network.loss(x_batch, t_batch)
     train_loss_list.append(loss)

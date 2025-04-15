@@ -3,7 +3,7 @@ from upstream.dataset.mnist import load_mnist
 from common.networks import MultiLayerNet
 from common.optimizer import SGD
 
-(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True)
+(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True) # type: ignore[no-untyped-call]
 x_train = x_train[:300]
 t_train = t_train[:300]
 

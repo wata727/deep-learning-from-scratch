@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 from typing import Callable
 
-def numerical_gradient(f: Callable, x: npt.NDArray) -> npt.NDArray:
+def numerical_gradient[T: tuple[int, ...]](f: Callable[[npt.NDArray[np.double]], float], x: np.ndarray[T, np.dtype[np.double]]) -> np.ndarray[T, np.dtype[np.double]]:
     h = 1e-4
     grad = np.zeros_like(x)
 

@@ -4,7 +4,7 @@ from common.networks import MultiLayerNet
 from common.optimizer import SGD
 from common.layers import Affine
 
-(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True)
+(x_train, t_train), (x_test, t_test) = load_mnist(normalize=True, one_hot_label=True) # type: ignore[no-untyped-call]
 
 network = MultiLayerNet(input_size=784, hidden_size_list=[100, 100, 100, 100], output_size=10)
 

@@ -9,3 +9,7 @@ dependencies = [
     "mypy>=1.15.0",
     "numpy>=2.2.4",
 ]
+
+[[tool.mypy.overrides]]
+module = "upstream.*"
+ignore_errors = true

@@ -1,11 +1,11 @@
 import numpy as np
 import numpy.typing as npt
-from common.networks import MultiLayerNet
-from common.optimizer import SGD
+from common.networks import Network
+from common.optimizer import Optimizer
 
 class Trainer:
-    def __init__(self, network: MultiLayerNet, x_train: npt.NDArray, t_train: npt.NDArray, x_test: npt.NDArray, t_test: npt.NDArray,
-                 optimizer: SGD, epochs: int = 20, mini_batch_size: int = 100, verbose: bool = True):
+    def __init__(self, network: Network, x_train: npt.NDArray[np.double], t_train: npt.NDArray[np.double], x_test: npt.NDArray[np.double], t_test: npt.NDArray[np.double],
+                 optimizer: Optimizer, epochs: int = 20, mini_batch_size: int = 100, verbose: bool = True):
         self.network = network
         self.x_train = x_train
         self.t_train = t_train
@@ -20,9 +20,9 @@ class Trainer:
         self.iter_per_epoch = max(self.train_size / mini_batch_size, 1)
         self.max_iter = int(epochs * self.iter_per_epoch)
 
-        self.train_loss_list = []
-        self.train_acc_list = []
-        self.test_acc_list = []
+        self.train_loss_list: list[float] = []
+        self.train_acc_list: list[float] = []
+        self.test_acc_list: list[float] = []
 
     def train(self) -> tuple[float, float]:
         for i in range(self.max_iter):
